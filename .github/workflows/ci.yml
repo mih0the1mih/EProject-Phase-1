@@ -1,16 +1,16 @@
-name: CI - Node.js Microservices
+name: CI - Kiểm tra Chất lượng Code
 
+# Workflow này sẽ chạy khi có push lên nhánh 'main' hoặc 'master'
 on:
   push:
-    branches: ["master"]
-  pull_request:
-    branches: ["master"]
+    branches: ["main", "master"]
 
 jobs:
-  test:
-    name: Install & Test All Services
+  # JOB CHÍNH: CHẠY BÀI KIỂM THỬ (CI)
+  # Đảm bảo tất cả các service hoạt động đúng trước khi tiến hành các bước khác
+  run-tests:
+    name: 🧪 Install & Test All Services
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,30 +20,21 @@ jobs:
         with:
           node-version: 18
 
+      # Cài đặt dependencies cho từng service
       - name: Install dependencies for all services
         run: |
           echo "📦 Installing dependencies for auth service..."
-          cd auth && npm install || echo "⚠️ Auth service not found" && cd ..
-
+          cd auth && npm install && cd ..
           echo "📦 Installing dependencies for product service..."
-          cd product && npm install || echo "⚠️ Product service not found" && cd ..
+          cd product && npm install && cd ..
+          # Bạn có thể thêm các service khác vào đây nếu cần
 
-          echo "📦 Installing dependencies for order service..."
-          cd order && npm install || echo "⚠️ Order service not found" && cd ..
-
-          echo "📦 Installing root dependencies..."
-          npm install || true
-
+      # Chạy các bài kiểm thử
       - name: Run tests for each service
         run: |
           echo "🧪 Testing auth service..."
-          cd auth && npm test || echo "⚠️ Auth tests failed or skipped" && cd ..
-
+          cd auth && npm test && cd ..
           echo "🧪 Testing product service..."
-          cd product && npm test || echo "⚠️ Product tests failed or skipped" && cd ..
-
-          echo "🧪 Testing order service..."
-          cd order && npm test || echo "⚠️ Order tests failed or skipped" && cd ..
-
-      - name: ✅ Build finished
-        run: echo "🎉 All services built & tested successfully!"
+          cd product && npm test && cd ..
+          # Chạy test cho các service khác...
+          echo "🎉 All tests passed!"
