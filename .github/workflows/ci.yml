@@ -20,21 +20,29 @@ jobs:
         with:
           node-version: 18
 
-      # Cài đặt dependencies cho từng service
-      - name: Install dependencies for all services
-        run: |
-          echo "📦 Installing dependencies for auth service..."
-          cd auth && npm install && cd ..
-          echo "📦 Installing dependencies for product service..."
-          cd product && npm install && cd ..
+      # CÀI ĐẶT DEPENDENCIES CHO AUTH
+      - name: Install dependencies for auth service
+        run: npm install
+        working-directory: ./auth # <--- Bắt buộc chạy lệnh trong thư mục 'auth'
+
+      # CÀI ĐẶT DEPENDENCIES CHO PRODUCT
+      - name: Install dependencies for product service
+        run: npm install
+        working-directory:
+          ./product # <--- Bắt buộc chạy lệnh trong thư mục 'product'
           # Bạn có thể thêm các service khác vào đây nếu cần
 
-      # Chạy các bài kiểm thử
-      - name: Run tests for each service
-        run: |
-          echo "🧪 Testing auth service..."
-          cd auth && npm test && cd ..
-          echo "🧪 Testing product service..."
-          cd product && npm test && cd ..
+      # CHẠY TEST CHO AUTH
+      - name: Testing auth service
+        run: npm test
+        working-directory: ./auth # <--- Bắt buộc chạy lệnh test trong thư mục 'auth'
+
+      # CHẠY TEST CHO PRODUCT
+      - name: Testing product service
+        run: npm test
+        working-directory:
+          ./product # <--- Bắt buộc chạy lệnh test trong thư mục 'product'
           # Chạy test cho các service khác...
-          echo "🎉 All tests passed!"
+
+      - name: ✅ All tests passed successfully
+        run: echo "🎉 All tests passed!"
