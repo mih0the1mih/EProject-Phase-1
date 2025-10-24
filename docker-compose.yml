@@ -1,0 +1,148 @@
+version: "3.8"
+
+services:
+  # ===================== Infrastructure (internal only) =====================
+  mongo:
+    image: mongo:6.0-jammy        # jammy có sẵn 'mongosh'
+    container_name: mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    expose:
+      - "27017"                   # chỉ nội bộ
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand({ ping: 1 })\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    expose:
+      - "5672"                    # AMQP internal
+      - "15672"                   # UI internal (không public ra host)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # ===================== Application Services =====================
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    environment:
+      - PORT=3003
+    ports:
+      - "3003:3003"               # 👈 chỉ public gateway
+    depends_on:
+      auth:
+        condition: service_healthy
+      product:
+        condition: service_healthy
+      order:
+        condition: service_healthy
+    healthcheck:
+      # nếu app có /health thì thay URL cho chuẩn hơn
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  auth:
+    build:
+      context: ./auth
+      dockerfile: Dockerfile
+    container_name: auth
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - JWT_SECRET=mysecretkey
+      - MONGODB_AUTH_URI=mongodb://mongo:27017/authdb
+    expose:
+      - "3000"                    # chỉ nội bộ
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  product:
+    build:
+      context: ./product
+    container_name: product
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - JWT_SECRET=mysecretkey
+      - MONGODB_PRODUCT_URI=mongodb://mongo:27017/productdb
+      # Nếu code dùng tên biến khác cho AMQP thì giữ cả hai để an toàn
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - AMQP_URL=amqp://rabbitmq:5672
+    expose:
+      - "3001"                    # chỉ nội bộ
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 3001 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  order:
+    build:
+      context: ./order
+    container_name: order
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+      - JWT_SECRET=mysecretkey
+      - MONGODB_ORDER_URI=mongodb://mongo:27017/orderdb
+      # nếu code tham chiếu chéo, để sẵn cho tiện
+      - MONGODB_PRODUCT_URI=mongodb://mongo:27017/productdb
+      - MONGODB_AUTH_URI=mongodb://mongo:27017/authdb
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - AMQP_URL=amqp://rabbitmq:5672
+    expose:
+      - "3002"                    # chỉ nội bộ
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 3002 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+# ===================== Volumes & Networks =====================
+volumes:
+  mongo_data:
+
+networks:
+  backend:
+    driver: bridge
